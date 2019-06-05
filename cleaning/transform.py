@@ -20,6 +20,7 @@ LOGGER.addHandler(FH)
 LOGGER.info("Start new run".center(49, "="))
 
 DATAPATH = os.path.join("data", "ghcnd", "ghcnd_all")
+OUTPATH = os.path.join("data", "ghcnd", "cleaned")
 MANIFEST = os.path.join("data", "ghcnd", "data_overview.csv")
 FILELIST = glob(os.path.join(DATAPATH, "*.dly"))
 
@@ -46,7 +47,7 @@ def clean(filename):
 
     # Fix the index
     id_vars = dirty.index.str.extract(
-        r"^([A-Za-z0-9\-]{11})(\d{4})(\d{2})(.*)$",
+        r"^([_A-Za-z0-9\-]{11})(\d{4})(\d{2})(.*)$",
         expand=True).set_index(dirty.index)
     id_vars.columns = ["station", "year", "month", "measure"]
 
@@ -137,14 +138,14 @@ def diagnose(data):
 
 
 def main(filename):
-    csv_name = filename.replace(".dly", ".csv")
+    csv_name = filename.replace(".dly", ".csv").replace(DATAPATH+"/", "")
     LOGGER.info(csv_name.center(49, "-"))
 
     try:
         out = clean(filename)
         diag = diagnose(out)
-        diag["file"] = csv_name.replace(DATAPATH + "/", "")
-        out.to_csv(csv_name)
+        diag["file"] = csv_name
+        out.to_csv(os.path.join(OUTPATH, csv_name))
         if not os.path.exists(MANIFEST):
             diag.to_csv(MANIFEST, index=False)
         elif os.path.exists(MANIFEST):
