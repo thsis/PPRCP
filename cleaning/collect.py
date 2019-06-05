@@ -11,16 +11,23 @@ from joblib import delayed, Parallel
 
 DATADIR = os.path.join("data", "ghcnd", "clean")
 OUTDIR = os.path.join("data", "ghcnd", "ghcnd_08_18_all.csv")
+OVERVIEWDIR = os.path.join("data", "ghcnd", "data_overview.csv")
 FILELIST = glob(os.path.join(DATADIR, "*.csv"))
 
 START = pd.to_datetime("2008-01-01")
 END = pd.to_datetime("2018-12-31")
 DATE_RANGE = pd.date_range(START, END)
 
+# Create a template header that contains all possible measurements.
+OVERVIEW = pd.read_csv(OVERVIEWDIR, usecols=["column"])
+COLUMNS = ["station"] + OVERVIEW.column.unique().tolist()
+TEMPLATE = pd.DataFrame(columns=COLUMNS)
+
 
 def read_and_slice(filename):
     """Read dataframe and select the relevant timeframe."""
     out = pd.read_csv(filename, index_col=["date"], parse_dates=["date"])
+    out = pd.concat([TEMPLATE, out], sort=False)
     out = out.loc[out.index.isin(DATE_RANGE)]
     return out
 
@@ -48,10 +55,13 @@ if __name__ == "__main__":
                         help="number of jobs")
     PARSER.add_argument("--dry-run", default=False, action="store_true",
                         help="if provided will not write to disk")
-    ARGS = PARSER.parse_args(["--dry-run"])
+    ARGS = PARSER.parse_args()
+    if not ARGS.dry_run:
+        TEMPLATE.to_csv(OUTDIR)
 
     for chunk in tqdm(list(get_chunk(FILELIST, size=ARGS.n_jobs))):
-        OUT = Parallel(n_jobs=ARGS.n_jobs)(delayed(read_and_slice)(f) for f in chunk)
+        OUT = Parallel(n_jobs=ARGS.n_jobs)(
+            delayed(read_and_slice)(f) for f in chunk)
         OUT = pd.concat(OUT, sort=False)
         if not ARGS.dry_run:
-            OUT.to_csv(OUTDIR, mode="a")
+            OUT.to_csv(OUTDIR, mode="a", header=None)
