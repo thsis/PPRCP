@@ -9,7 +9,7 @@ import pandas as pd
 from tqdm import tqdm
 from joblib import delayed, Parallel
 
-DATADIR = os.path.join("data", "ghcnd", "clean")
+DATADIR = os.path.join("data", "ghcnd", "cleaned")
 OUTDIR = os.path.join("data", "ghcnd", "ghcnd_08_18_all.csv")
 OVERVIEWDIR = os.path.join("data", "ghcnd", "data_overview.csv")
 FILELIST = glob(os.path.join(DATADIR, "*.csv"))
