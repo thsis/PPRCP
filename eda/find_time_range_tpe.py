@@ -42,6 +42,7 @@ FORMATTER = logging.Formatter(FORMAT)
 FILE_HANDLER.setFormatter(FORMATTER)
 LOGGER.addHandler(FILE_HANDLER)
 LOGGER.info("%s Start new run %s", 10 * "=", 10 * "=")
+LOGGER.info("Start, Stop, Score")
 
 DATADIR = os.path.join("data", "ghcnd", "ghcnd_08_18_all.csv")
 OUTDIR = os.path.join("eda", "select.csv")
@@ -102,6 +103,7 @@ def objective(params):
         summary = relevant.groupby(level=[0]).count()
         stations = (summary.prcp >= days).sum()
         score = stations * days
+        LOGGER.info("%s, %s, %s", start, stop, score)
         return -score
     except ValueError:
         return 0
@@ -121,7 +123,7 @@ def find_min():
     best = fmin(fn=objective,
                 space=space,
                 algo=tpe.suggest,
-                max_evals=500_000,
+                max_evals=100,
                 trials=trials)
     return best, trials
 
@@ -140,6 +142,7 @@ def visualize(trials):
 if __name__ == "__main__":
     BEST, TRIALS = find_min()
     pprint(BEST)
+    LOGGER.info(10 * "-" + " Best run " + "-" * 10)
     LOGSTR_1 = "From: {start_d:.0f}-{start_m:.0f}-{start_y:.0f}".format(**BEST)
     LOGSTR_2 = "To: {stop_d:.0f}-{stop_m:.0f}-{stop_y:.0f}".format(**BEST)
     LOGGER.info(LOGSTR_1)
