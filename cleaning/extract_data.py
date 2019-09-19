@@ -3,8 +3,9 @@ Extract data from a relevant time frame.
 """
 
 import os
-import logging
 import pandas as pd
+
+from models.utilities import get_logger
 
 
 class Subsetter:
@@ -14,15 +15,9 @@ class Subsetter:
         self.data = None
         self.stations = None
         self.dates = None
+        self.n_dates = None
         self.idx = None
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.INFO)
-        logfile = os.path.join("logs", "extract_data.log")
-        file_handler = logging.FileHandler(logfile)
-        log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        formatter = logging.Formatter(log_format)
-        file_handler.setFormatter(formatter)
-        self.logger.info("%s Start extraction %s", 10 * "=", 10 * "=")
+        self.logger = get_logger(os.path.join("logs", "extract_data.log"))
 
     def read(self, path, **kwargs):
         """Wraps `pandas.read_csv`"""
@@ -32,6 +27,7 @@ class Subsetter:
         """Extract stations in the raw data and create a `pd.MultiIndex`."""
         self.stations = self.data.index.get_level_values("station").unique()
         self.dates = pd.date_range("2008/04/14", "2017/12/10")
+        self.n_dates = len(self.dates)
         self.idx = pd.MultiIndex.from_product([self.stations, self.dates])
 
     def reindex(self):
@@ -43,11 +39,11 @@ class Subsetter:
 
     def clean(self):
         """Remove stations with missing values """
-        na_counts = self.data.groupby(level=1).PRCP.count()
-        check_stations = na_counts == 3528
-        whitelist = check_stations.loc[check_stations].index.values
+        non_na_counts = self.data.groupby(level=0).PRCP.count()
+        check_stations = non_na_counts == self.n_dates
+        whitelist = check_stations.loc[check_stations].index
         ok_rows_idx = self.data.index.get_level_values(0).isin(whitelist)
-        self.data = self.data.loc[ok_rows_idx]
+        self.data = self.data.iloc[ok_rows_idx]
         self.check_integrity()
 
     def check_integrity(self):
@@ -55,12 +51,13 @@ class Subsetter:
         n_stations = self.data.index.get_level_values(0).nunique()
         n_days = self.data.index.get_level_values(1).nunique()
         try:
-            assert n_days == 3528, "Wrong number of days"
-            assert n_stations == 2642, "Wrong number of stations"
-            self.logger.info("Everything as expected")
-
+            assert n_days == 3528, f"{n_days} days instead of 3528"
         except AssertionError as exc:
-            self.logger.exception(exc)
+            self.logger.warning(exc)
+        try:
+            assert n_stations == 2642, f"{n_stations} stations instead of 2642"
+        except AssertionError as exc:
+            self.logger.warning(exc)
 
     def write(self, path, **kwargs):
         """Write data to disk."""
@@ -73,7 +70,8 @@ def main():
     outpath = os.path.join("data", "ghcnd", "ghcnd.csv")
 
     subsetter = Subsetter()
-    subsetter.read(datapath, parse_dates=[0], index_col=[1, 0], header=0)
+    subsetter.read(datapath, parse_dates=[0], index_col=[1, 0], header=0,
+                   usecols=range(14))
     subsetter.get_index()
     subsetter.reindex()
     subsetter.clean()
